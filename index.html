@@ -1,12 +1,17 @@
-<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
-<meta name="claude:viewport-fit-sides" content="cover">
-<title>Cavalier Solitaire</title>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0b0c10">
+<title>Cavalier Solitaire &amp; Dames en folie</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
 <style>
-  /* Layout: a single centered column — title, status line, an 8x8 board whose
-     edge squares carry their own rank/file labels, controls, and a collapsible
-     move list. A deliberately dark "midnight study" palette: the board stays
-     quiet so the gold trail left by the knight is the only thing that moves. */
+  /* Une seule colonne centrée. Palette « étude de minuit » : l'échiquier reste
+     discret, c'est la couleur du jeu (bleu pour le cavalier, or pour les dames)
+     qui attire l'œil. */
   :root{
     --bg:#0b0c10;
     --panel:#121319;
@@ -14,73 +19,333 @@
     --sq-dark:#38373a;
     --fg:#ece9e2;
     --fg-dim:#8d8c96;
-    --accent:#4f8fe6;
-    --accent-rgb:79,143,230;
+    --knight-rgb:79,143,230;
+    --queen-rgb:226,177,86;
     --warn-rgb:209,113,90;
-    color-scheme: dark;
+    --accent-rgb:var(--knight-rgb);
+    color-scheme:dark;
   }
+  /* --accent est défini sur body (et non sur :root) pour suivre la couleur de l'onglet actif */
+  body{ --accent:rgb(var(--accent-rgb)); }
+  body[data-tab="queens"]{ --accent-rgb:var(--queen-rgb); --accent:rgb(var(--accent-rgb)); }
 
   *{ box-sizing:border-box; }
+  [hidden]{ display:none!important; }
 
+  html{ -webkit-text-size-adjust:100%; }
   body{
-    background:var(--bg);
+    margin:0;
+    min-height:100vh;
+    background:
+      radial-gradient(120% 55% at 50% -8%, rgba(var(--accent-rgb),.13), transparent 62%),
+      var(--bg);
+    background-attachment:fixed;
     color:var(--fg);
     font-family:'IBM Plex Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+    font-size:14px;
     padding-left:max(16px, env(safe-area-inset-left,0px));
     padding-right:max(16px, env(safe-area-inset-right,0px));
+    transition:background-color .3s ease;
+  }
+  button{ font-family:inherit; }
+
+  /* ---------- Images de fond (cavaliers et dames) ---------- */
+  .deco{
+    position:fixed;
+    inset:0;
+    overflow:hidden;
+    pointer-events:none;
+    z-index:0;
+  }
+  .deco svg{
+    position:absolute;
+    left:var(--x);
+    top:var(--y);
+    width:var(--s);
+    height:var(--s);
+    color:var(--tint,var(--fg));
+    fill:currentColor;
+    opacity:var(--o,.06);
+    transform:rotate(var(--r,0deg)) scaleX(var(--f,1));
+    animation:drift 14s ease-in-out infinite;
+    animation-delay:var(--d,0s);
+  }
+  @keyframes drift{
+    0%,100%{ translate:0 0; }
+    50%{ translate:0 -12px; }
+  }
+  .deco.home::after,
+  .deco.queens::after{
+    content:"";
+    position:absolute;
+    left:0; right:0; bottom:0;
+    height:46vh;
+    background:conic-gradient(rgba(255,255,255,.04) 25%,transparent 0 50%,rgba(255,255,255,.04) 0 75%,transparent 0) 0 0/76px 76px;
+    -webkit-mask-image:linear-gradient(to top,#000,transparent);
+            mask-image:linear-gradient(to top,#000,transparent);
+  }
+  @media (prefers-reduced-motion:reduce){
+    .deco svg{ animation:none; }
   }
 
+  /* ---------- Page et onglets ---------- */
   .page{
+    position:relative;
+    z-index:1;
     max-width:440px;
     margin-inline:auto;
     display:flex;
     flex-direction:column;
     gap:18px;
-    padding-block:28px 40px;
+    padding-block:max(10px, env(safe-area-inset-top,0px)) 48px;
   }
 
-  header.top{
-    display:flex;
-    align-items:baseline;
-    justify-content:space-between;
-    gap:12px;
+  .tabs{
+    position:sticky;
+    top:max(8px, env(safe-area-inset-top,0px));
+    z-index:30;
+    display:grid;
+    grid-template-columns:repeat(3,1fr);
+    gap:4px;
+    padding:5px;
+    border-radius:16px;
+    background:rgba(14,15,20,.78);
+    border:1px solid rgba(255,255,255,.08);
+    -webkit-backdrop-filter:blur(14px);
+            backdrop-filter:blur(14px);
   }
+  button.tab{
+    --t:236,233,226;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    gap:8px;
+    padding:10px 6px;
+    border-radius:12px;
+    border:1px solid transparent;
+    background:transparent;
+    color:var(--fg-dim);
+    font:500 .86rem 'IBM Plex Sans',sans-serif;
+    cursor:pointer;
+    -webkit-tap-highlight-color:transparent;
+    transition:background-color .2s ease, color .2s ease, border-color .2s ease;
+  }
+  button.tab[data-tab="knight"]{ --t:var(--knight-rgb); }
+  button.tab[data-tab="queens"]{ --t:var(--queen-rgb); }
+  button.tab svg{ width:18px; height:18px; flex:none; }
+  button.tab svg.pc{ width:20px; height:20px; stroke:none; filter:none; }
+  button.tab:hover{ color:var(--fg); }
+  button.tab[aria-selected="true"]{
+    color:rgb(var(--t));
+    background:rgba(var(--t),.14);
+    border-color:rgba(var(--t),.35);
+  }
+  button.tab:focus-visible{ outline:2px solid rgb(var(--t)); outline-offset:2px; }
+
+  .view{ display:flex; flex-direction:column; gap:18px; }
+
   h1{
     font-family:'Fraunces',Georgia,'Times New Roman',serif;
     font-weight:600;
-    font-size:clamp(1.4rem,6vw,1.8rem);
+    font-size:clamp(1.5rem,7vw,1.9rem);
     line-height:1.1;
     letter-spacing:-0.01em;
     margin:0;
     text-wrap:balance;
   }
+  h1.big{ font-size:clamp(2.1rem,11vw,2.9rem); line-height:1.02; }
+  .eyebrow{
+    font:500 .7rem 'IBM Plex Mono',monospace;
+    letter-spacing:.16em;
+    text-transform:uppercase;
+    color:var(--fg-dim);
+    margin:0 0 10px;
+  }
+  .sub{ margin:0; color:var(--fg-dim); font-size:.92rem; line-height:1.45; }
+  .lab{
+    font:500 .7rem 'IBM Plex Mono',monospace;
+    letter-spacing:.12em;
+    text-transform:uppercase;
+    color:var(--fg-dim);
+    margin:0 0 8px;
+  }
+
+  /* ---------- Accueil ---------- */
+  .hero{ padding:26px 2px 4px; }
+  .cards{ display:flex; flex-direction:column; gap:14px; }
+  button.card{
+    --c:var(--knight-rgb);
+    position:relative;
+    display:grid;
+    grid-template-columns:68px 1fr;
+    gap:16px;
+    align-items:center;
+    text-align:left;
+    padding:16px;
+    border-radius:20px;
+    border:1px solid rgba(var(--c),.28);
+    background:linear-gradient(155deg, rgba(var(--c),.16), rgba(18,19,25,.88) 58%);
+    color:var(--fg);
+    cursor:pointer;
+    -webkit-tap-highlight-color:transparent;
+    transition:transform .15s ease, border-color .2s ease;
+  }
+  button.card.queens{ --c:var(--queen-rgb); }
+  button.card:hover{ border-color:rgba(var(--c),.6); }
+  button.card:active{ transform:scale(.985); }
+  button.card:focus-visible{ outline:2px solid rgb(var(--c)); outline-offset:2px; }
+  .card .ico{
+    width:68px; height:68px;
+    border-radius:16px;
+    display:grid; place-items:center;
+    background:rgba(var(--c),.14);
+    border:1px solid rgba(var(--c),.32);
+    color:rgb(var(--c));
+  }
+  .card .ico svg{ width:44px; height:44px; fill:currentColor; }
+  .card .ttl{
+    display:block;
+    margin:0 0 4px;
+    font:600 1.25rem 'Fraunces',Georgia,serif;
+    letter-spacing:-.005em;
+  }
+  .card .desc{ display:block; margin:0 0 10px; color:var(--fg-dim); font-size:.86rem; line-height:1.4; }
+  .card .ico svg.pc{ stroke:none; filter:none; }
+  .card .meta{
+    display:inline-block;
+    font:500 .74rem 'IBM Plex Mono',monospace;
+    color:rgb(var(--c));
+    background:rgba(var(--c),.12);
+    border:1px solid rgba(var(--c),.28);
+    padding:3px 9px;
+    border-radius:999px;
+  }
+
+  /* ---------- Commandes communes ---------- */
+  .seg{
+    display:grid;
+    grid-template-columns:repeat(3,1fr);
+    gap:4px;
+    padding:4px;
+    border-radius:12px;
+    background:var(--panel);
+    border:1px solid rgba(255,255,255,.08);
+  }
+  .seg.two{ grid-template-columns:repeat(2,1fr); }
+  .seg button{
+    padding:10px 6px;
+    border-radius:9px;
+    border:1px solid transparent;
+    background:transparent;
+    color:var(--fg-dim);
+    font:500 .86rem 'IBM Plex Sans',sans-serif;
+    cursor:pointer;
+    -webkit-tap-highlight-color:transparent;
+    transition:background-color .2s ease, color .2s ease;
+  }
+  .seg button[aria-pressed="true"]{
+    color:var(--accent);
+    background:rgba(var(--accent-rgb),.16);
+    border-color:rgba(var(--accent-rgb),.38);
+  }
+  .seg button:focus-visible{ outline:2px solid var(--accent); outline-offset:2px; }
+  .hint-note{ margin:8px 2px 0; color:var(--fg-dim); font-size:.8rem; line-height:1.45; }
+
+  .chips{ display:grid; grid-template-columns:repeat(7,1fr); gap:6px; }
+  .chips button{
+    min-width:0;
+    padding:10px 0;
+    border-radius:10px;
+    border:1px solid rgba(255,255,255,.1);
+    background:var(--panel);
+    color:var(--fg-dim);
+    font:500 .86rem 'IBM Plex Mono',monospace;
+    cursor:pointer;
+    -webkit-tap-highlight-color:transparent;
+  }
+  .chips button[aria-pressed="true"]{
+    color:var(--accent);
+    background:rgba(var(--accent-rgb),.16);
+    border-color:rgba(var(--accent-rgb),.4);
+  }
+  .chips button:focus-visible{ outline:2px solid var(--accent); outline-offset:2px; }
+
   .chip{
     font-family:'IBM Plex Mono',monospace;
     font-variant-numeric:tabular-nums;
-    font-size:0.85rem;
+    font-size:.85rem;
     color:var(--accent);
-    background:rgba(var(--accent-rgb),0.12);
-    border:1px solid rgba(var(--accent-rgb),0.3);
+    background:rgba(var(--accent-rgb),.12);
+    border:1px solid rgba(var(--accent-rgb),.3);
     padding:5px 10px;
     border-radius:999px;
     white-space:nowrap;
     flex:none;
   }
 
+  .gamebar{ display:flex; align-items:center; justify-content:space-between; gap:12px; }
+  button.back{
+    display:inline-flex;
+    align-items:center;
+    gap:4px;
+    padding:7px 12px 7px 8px;
+    border-radius:999px;
+    border:1px solid rgba(255,255,255,.1);
+    background:var(--panel);
+    color:var(--fg);
+    font:500 .84rem 'IBM Plex Sans',sans-serif;
+    cursor:pointer;
+    -webkit-tap-highlight-color:transparent;
+  }
+  button.back svg{ width:16px; height:16px; }
+  button.back:hover{ border-color:rgba(var(--accent-rgb),.4); }
+  button.back:focus-visible{ outline:2px solid var(--accent); outline-offset:2px; }
+
   .status{
     margin:0;
-    font-size:0.92rem;
+    font-size:.92rem;
+    line-height:1.45;
     color:var(--fg-dim);
-    min-height:1.3em;
+    min-height:1.45em;
     transition:color .2s ease;
   }
   .status.won{ color:var(--accent); }
   .status.stuck{ color:rgb(var(--warn-rgb)); }
 
+  .controls{ display:flex; gap:10px; }
+  button.action{
+    flex:1;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    gap:8px;
+    padding:11px 12px;
+    border-radius:10px;
+    border:1px solid rgba(255,255,255,.1);
+    background:var(--panel);
+    color:var(--fg);
+    font:500 .9rem 'IBM Plex Sans',sans-serif;
+    cursor:pointer;
+    -webkit-tap-highlight-color:transparent;
+    transition:border-color .15s ease, opacity .15s ease;
+  }
+  button.action:hover{ border-color:rgba(var(--accent-rgb),.4); }
+  button.action:focus-visible{ outline:2px solid var(--accent); outline-offset:2px; }
+  button.action:disabled{ opacity:.4; cursor:default; }
+  button.action.primary{
+    background:rgba(var(--accent-rgb),.14);
+    border-color:rgba(var(--accent-rgb),.4);
+    color:var(--accent);
+  }
+  button.action svg{ width:16px; height:16px; flex:none; }
+
+  /* ---------- Plateaux (communs au cavalier et aux dames) ---------- */
   .board-wrap{
     position:relative;
     width:100%;
-    aspect-ratio:1;
+    max-width:calc(var(--cols,8) * 86px + 16px);
+    margin-inline:auto;
+    padding:8px;
     border-radius:16px;
     background:var(--panel);
   }
@@ -94,54 +359,30 @@
   }
 
   .board{
-    position:absolute;
-    inset:8px;
+    position:relative;
     display:grid;
-    grid-template-columns:repeat(8,1fr);
-    grid-template-rows:repeat(8,1fr);
     gap:3px;
   }
 
-  .knight{
-    position:absolute;
-    display:flex;
-    align-items:center;
-    justify-content:center;
-    font-size:min(7.5vw,30px);
-    color:var(--accent);
-    filter:drop-shadow(0 2px 6px rgba(0,0,0,.6));
-    transition:left .22s cubic-bezier(.4,0,.2,1), top .22s cubic-bezier(.4,0,.2,1), transform .22s ease;
-    pointer-events:none;
-    opacity:0;
-    z-index:5;
-  }
-  .knight.placed{ opacity:1; }
-  .knight.landed{ transform:scale(1.15); }
-
   .sq{
     position:relative;
+    aspect-ratio:1;
     border-radius:6px;
     cursor:pointer;
     -webkit-tap-highlight-color:transparent;
     user-select:none;
+    -webkit-user-select:none;
     touch-action:manipulation;
     transition:background-color .2s ease, box-shadow .2s ease;
   }
   .sq.light{ background:var(--sq-light); }
   .sq.dark{ background:var(--sq-dark); }
-  .sq:focus-visible{ outline:2px solid var(--accent); outline-offset:2px; }
-  .sq.legal{ box-shadow:inset 0 0 0 1px rgba(var(--accent-rgb),.35); }
-  .sq.legal::after{
-    content:"";
-    position:absolute;
-    inset:0;
-    margin:auto;
-    width:22%;
-    height:22%;
-    border-radius:50%;
-    background:rgba(var(--accent-rgb),.5);
+  .sq:focus-visible{ outline:2px solid var(--accent); outline-offset:2px; z-index:3; }
+  .sq.blocked{
+    cursor:default;
+    background:repeating-linear-gradient(45deg, rgba(255,255,255,.05) 0 2px, transparent 2px 7px);
+    box-shadow:inset 0 0 0 1px rgba(255,255,255,.06);
   }
-  .sq.current{ box-shadow:inset 0 0 0 2px var(--accent); }
   .sq.invalid{ animation:shake .3s ease; }
   @keyframes shake{
     10%,90%{ transform:translateX(-2px); }
@@ -152,21 +393,13 @@
   @media (prefers-reduced-motion:reduce){
     .sq.invalid{ animation:none; box-shadow:inset 0 0 0 2px rgba(var(--warn-rgb),.7); }
   }
-
-  .sq .order{
-    position:absolute;
-    inset:0;
-    display:flex;
-    align-items:center;
-    justify-content:center;
-    font-family:'IBM Plex Mono',monospace;
-    font-size:11px;
-    font-weight:600;
-    color:var(--fg);
-    text-shadow:0 1px 3px rgba(0,0,0,.7);
-    opacity:.85;
-    pointer-events:none;
+  .sq.hint{
+    z-index:2;
+    box-shadow:inset 0 0 0 3px var(--accent), 0 0 18px rgba(var(--accent-rgb),.65);
+    animation:hintPulse 1s ease-in-out 3;
   }
+  @keyframes hintPulse{ 50%{ transform:scale(1.07); } }
+
   .sq .rank, .sq .file{
     position:absolute;
     font-family:'IBM Plex Mono',monospace;
@@ -178,31 +411,71 @@
   .sq .rank{ top:3px; left:4px; }
   .sq .file{ bottom:2px; right:4px; }
 
-  .controls{ display:flex; gap:10px; }
-  button.action{
-    flex:1;
+  /* Pièces dessinées (cavalier, dame) : contour sombre pour rester lisibles
+     aussi bien sur les cases claires que sur les cases sombres. */
+  svg.pc{
+    fill:currentColor;
+    stroke:#0b0c10;
+    stroke-width:3.2;
+    stroke-linejoin:round;
+    paint-order:stroke;
+    overflow:visible;
+    filter:drop-shadow(0 2px 4px rgba(0,0,0,.4));
+  }
+
+  /* ---------- Cavalier ---------- */
+  .sq.k .order{
+    position:absolute;
+    inset:0;
     display:flex;
     align-items:center;
     justify-content:center;
-    gap:8px;
-    padding:11px 14px;
-    border-radius:10px;
-    border:1px solid rgba(255,255,255,.1);
-    background:var(--panel);
+    font-family:'IBM Plex Mono',monospace;
+    font-size:clamp(9px,2.6vw,12px);
+    font-weight:600;
     color:var(--fg);
-    font:500 0.9rem 'IBM Plex Sans',sans-serif;
-    cursor:pointer;
-    transition:border-color .15s ease, opacity .15s ease;
+    text-shadow:0 1px 3px rgba(0,0,0,.7);
+    opacity:.85;
+    pointer-events:none;
   }
-  button.action:hover{ border-color:rgba(var(--accent-rgb),.4); }
-  button.action:focus-visible{ outline:2px solid var(--accent); outline-offset:2px; }
-  button.action:disabled{ opacity:.4; cursor:default; }
-  button.action.primary{
-    background:rgba(var(--accent-rgb),.14);
-    border-color:rgba(var(--accent-rgb),.4);
+  .sq.legal{ box-shadow:inset 0 0 0 1px rgba(var(--accent-rgb),.35); }
+  .sq .dot{
+    position:absolute;
+    inset:0;
+    margin:auto;
+    width:26%;
+    height:26%;
+    min-width:14px;
+    min-height:14px;
+    max-width:22px;
+    max-height:22px;
+    border-radius:50%;
+    background:rgba(var(--accent-rgb),.5);
+    display:none;
+    align-items:center;
+    justify-content:center;
+    font:600 10px 'IBM Plex Mono',monospace;
+    color:#0b0c10;
+    pointer-events:none;
+  }
+  .sq.legal .dot{ display:flex; }
+  .sq.legal.nocount .dot{ font-size:0; width:22%; height:22%; min-width:0; min-height:0; }
+  .sq.current{ box-shadow:inset 0 0 0 2px var(--accent); }
+
+  .knight{
+    position:absolute;
+    display:flex;
+    align-items:center;
+    justify-content:center;
     color:var(--accent);
+    transition:left .22s cubic-bezier(.4,0,.2,1), top .22s cubic-bezier(.4,0,.2,1), transform .22s ease;
+    pointer-events:none;
+    opacity:0;
+    z-index:5;
   }
-  button.action svg{ width:16px; height:16px; flex:none; }
+  .knight svg{ width:78%; height:78%; }
+  .knight.placed{ opacity:1; }
+  .knight.landed{ transform:scale(1.15); }
 
   details.path{
     border-top:1px solid rgba(255,255,255,.08);
@@ -214,7 +487,7 @@
     display:flex;
     align-items:center;
     gap:6px;
-    font-size:0.85rem;
+    font-size:.85rem;
     color:var(--fg-dim);
     -webkit-tap-highlight-color:transparent;
   }
@@ -224,7 +497,7 @@
   .path-list{
     margin-top:10px;
     font-family:'IBM Plex Mono',monospace;
-    font-size:0.82rem;
+    font-size:.82rem;
     color:var(--fg-dim);
     line-height:1.7;
     overflow-x:auto;
@@ -234,344 +507,1424 @@
   .path-list span{ color:var(--accent); }
 
   footer.rules{
-    font-size:0.82rem;
+    font-size:.82rem;
     color:var(--fg-dim);
     line-height:1.5;
     margin:0;
   }
+
+  /* Liste des plateaux */
+  .lvls{ display:flex; flex-direction:column; gap:10px; }
+  button.lvl{
+    display:grid;
+    grid-template-columns:64px 1fr auto;
+    gap:14px;
+    align-items:center;
+    padding:11px 14px 11px 11px;
+    border-radius:14px;
+    border:1px solid rgba(255,255,255,.09);
+    background:rgba(18,19,25,.86);
+    color:var(--fg);
+    text-align:left;
+    cursor:pointer;
+    -webkit-tap-highlight-color:transparent;
+    transition:border-color .2s ease, transform .15s ease;
+  }
+  button.lvl:hover{ border-color:rgba(var(--knight-rgb),.5); }
+  button.lvl:active{ transform:scale(.985); }
+  button.lvl:focus-visible{ outline:2px solid var(--accent); outline-offset:2px; }
+  .lvl .prev{ width:64px; height:64px; display:grid; place-items:center; }
+  .lvl .prev svg{ width:100%; height:100%; }
+  .lvl .nm{ display:block; font:600 1rem 'Fraunces',Georgia,serif; }
+  .lvl .dsc{ display:block; margin:3px 0 0; color:var(--fg-dim); font-size:.78rem; line-height:1.35; }
+  .lvl .tag{
+    font:500 .68rem 'IBM Plex Mono',monospace;
+    letter-spacing:.08em;
+    text-transform:uppercase;
+    color:rgb(var(--warn-rgb));
+    margin-left:6px;
+  }
+  .lvl .state{
+    font:500 .78rem 'IBM Plex Mono',monospace;
+    color:var(--fg-dim);
+    white-space:nowrap;
+    text-align:right;
+    min-width:44px;
+  }
+  .lvl .state .stars{ color:rgb(var(--knight-rgb)); letter-spacing:.08em; font-size:.9rem; }
+
+  /* ---------- Dames en folie ---------- */
+  .sq.q.has.locked::after{
+    content:"";
+    position:absolute;
+    right:5px; bottom:5px;
+    width:6px; height:6px;
+    border-radius:50%;
+    background:var(--fg);
+    box-shadow:0 0 0 1.5px #0b0c10;
+  }
+  .sq.q.attacked::before{
+    content:"";
+    position:absolute;
+    inset:0;
+    border-radius:inherit;
+    background:repeating-linear-gradient(135deg, rgba(var(--warn-rgb),.38) 0 3px, transparent 3px 8px);
+    pointer-events:none;
+  }
+  .sq.q.bad{ box-shadow:inset 0 0 0 2px rgba(var(--warn-rgb),.9); }
+  .sq.q .qpc{
+    position:absolute;
+    inset:0;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    color:rgb(var(--queen-rgb));
+    pointer-events:none;
+  }
+  .sq.q.light .qpc{ color:#c28a1c; }
+  .sq.q.locked .qpc{ color:var(--fg); }
+  .sq.q.bad .qpc{ color:rgb(var(--warn-rgb)); }
+  .qpc svg{ width:78%; height:78%; }
+  .sq.q.pop .qpc svg{ animation:pop .22s ease; }
+  @keyframes pop{ 0%{ transform:scale(.6); } 70%{ transform:scale(1.12); } 100%{ transform:scale(1); } }
+
+  .meter{
+    height:6px;
+    border-radius:99px;
+    background:rgba(255,255,255,.08);
+    overflow:hidden;
+    margin:8px 0 6px;
+  }
+  .meter > i{
+    display:block;
+    height:100%;
+    width:0;
+    background:var(--accent);
+    border-radius:99px;
+    transition:width .3s ease;
+  }
+  .coll{
+    border-top:1px solid rgba(255,255,255,.08);
+    padding-top:12px;
+    font-size:.85rem;
+    color:var(--fg-dim);
+  }
+  .coll b{ color:var(--fg); font-weight:500; font-family:'IBM Plex Mono',monospace; }
+
 </style>
+</head>
+<body data-tab="knight">
 
-<div class="page">
-  <header class="top">
-    <h1>Cavalier<br>Solitaire</h1>
-    <div class="chip" id="counter">0 / 64</div>
-  </header>
+<!-- Dessins réutilisés partout : le cavalier, la dame, la maison -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <defs>
+    <symbol id="i-knight" viewBox="0 0 100 100">
+      <path fill-rule="evenodd" d="M 18 96 L 82 96 L 82 88 Q 82 85 79 85 L 76 85 Q 85 77 79 69 Q 86 61 78 54 Q 83 46 74 40 Q 76 32 67 27 Q 65 22 56 19 L 57 5 L 46 12 C 39 15 31 21 25 29 C 19 36 13 44 11 52 C 10 57 14 61 20 60 C 26 59 31 55 36 52 C 40 50 43 52 41 56 C 36 63 26 69 24 80 L 24 85 L 21 85 Q 18 85 18 88 Z M 33 33 a 2.6 2.6 0 1 0 5.2 0 a 2.6 2.6 0 1 0 -5.2 0 Z M 14.5 51 a 1.4 1.4 0 1 0 2.8 0 a 1.4 1.4 0 1 0 -2.8 0 Z"/>
+    </symbol>
+    <symbol id="i-queen" viewBox="0 0 100 100">
+      <path d="M 18 96 L 82 96 L 82 88 Q 82 85 78 85 L 74 85 C 68 76 64 66 63 58 C 63 55 72 53 77 49 L 80 24 L 72 40 L 65 14 L 57.5 38 L 50 10 L 42.5 38 L 35 14 L 28 40 L 20 24 L 23 49 C 28 53 37 55 37 58 C 36 66 32 76 26 85 L 22 85 Q 18 85 18 88 Z"/>
+      <circle cx="80" cy="20" r="4.2"/>
+      <circle cx="65" cy="10" r="4.2"/>
+      <circle cx="50" cy="6" r="4.6"/>
+      <circle cx="35" cy="10" r="4.2"/>
+      <circle cx="20" cy="20" r="4.2"/>
+    </symbol>
+  </defs>
+</svg>
 
-  <p class="status" id="status" aria-live="polite">Touchez une case pour placer le cavalier.</p>
-
-  <div class="board-wrap" id="boardWrap">
-    <div class="board" id="board">
-      <div class="knight" id="knight">♞</div>
-    </div>
-  </div>
-
-  <div class="controls">
-    <button class="action" id="undoBtn" disabled>
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg>
-      Annuler
-    </button>
-    <button class="action primary" id="restartBtn">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 3v6h-6"/></svg>
-      Recommencer
-    </button>
-  </div>
-
-  <details class="path">
-    <summary>
-      <svg class="chev" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>
-      <span id="pathLabel">Parcours (0)</span>
-    </summary>
-    <div class="path-list" id="pathList">—</div>
-  </details>
-
-  <footer class="rules">
-    Le cavalier se déplace en L, comme aux échecs&nbsp;: deux cases dans un sens, une case perpendiculairement. Visitez chaque case une seule fois et tentez de remplir tout l'échiquier.
-  </footer>
+<!-- Images de fond : un décor différent selon l'onglet -->
+<div class="deco home" id="decoHome" aria-hidden="true">
+  <svg viewBox="0 0 100 100" style="--s:118vmin;--x:34vw;--y:24vh;--r:-8deg;--o:.075"><use href="#i-knight" width="100" height="100"/></svg>
+  <svg viewBox="0 0 100 100" style="--s:70vmin;--x:-20vmin;--y:-8vh;--r:10deg;--f:-1;--o:.05;--d:-4s"><use href="#i-knight" width="100" height="100"/></svg>
+  <svg viewBox="0 0 100 100" style="--s:36vmin;--x:64vw;--y:4vh;--r:14deg;--o:.065;--d:-8s"><use href="#i-knight" width="100" height="100"/></svg>
+  <svg viewBox="0 0 100 100" style="--s:30vmin;--x:2vw;--y:56vh;--r:-14deg;--f:-1;--o:.055;--d:-2s"><use href="#i-knight" width="100" height="100"/></svg>
+  <svg viewBox="0 0 100 100" style="--s:20vmin;--x:46vw;--y:50vh;--r:6deg;--o:.05;--d:-6s"><use href="#i-knight" width="100" height="100"/></svg>
+</div>
+<div class="deco" id="decoKnight" aria-hidden="true" hidden>
+  <svg viewBox="0 0 100 100" style="--s:96vmin;--x:42vw;--y:14vh;--r:-6deg;--o:.065;--tint:rgb(var(--knight-rgb))"><use href="#i-knight" width="100" height="100"/></svg>
+  <svg viewBox="0 0 100 100" style="--s:52vmin;--x:-14vmin;--y:50vh;--r:12deg;--f:-1;--o:.05;--tint:rgb(var(--knight-rgb));--d:-5s"><use href="#i-knight" width="100" height="100"/></svg>
+  <svg viewBox="0 0 100 100" style="--s:26vmin;--x:70vw;--y:-2vh;--r:8deg;--o:.06;--d:-9s"><use href="#i-knight" width="100" height="100"/></svg>
+</div>
+<div class="deco queens" id="decoQueens" aria-hidden="true" hidden>
+  <svg viewBox="0 0 100 100" style="--s:100vmin;--x:38vw;--y:22vh;--r:7deg;--o:.07;--tint:rgb(var(--queen-rgb))"><use href="#i-queen" width="100" height="100"/></svg>
+  <svg viewBox="0 0 100 100" style="--s:56vmin;--x:-16vmin;--y:-6vh;--r:-10deg;--o:.05;--tint:rgb(var(--queen-rgb));--d:-5s"><use href="#i-queen" width="100" height="100"/></svg>
+  <svg viewBox="0 0 100 100" style="--s:28vmin;--x:68vw;--y:2vh;--r:12deg;--f:-1;--o:.06;--tint:rgb(var(--queen-rgb));--d:-9s"><use href="#i-queen" width="100" height="100"/></svg>
 </div>
 
+<main class="page">
+
+  <nav class="tabs" role="tablist" aria-label="Choix du jeu">
+    <button class="tab" role="tab" data-tab="home" id="tab-home" aria-selected="true">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 11.5 12 5l8 6.5"/><path d="M6 10.5V19h12v-8.5"/></svg>
+      Accueil
+    </button>
+    <button class="tab" role="tab" data-tab="knight" id="tab-knight" aria-selected="false">
+      <svg class="pc" viewBox="0 0 100 100" aria-hidden="true"><use href="#i-knight" width="100" height="100"/></svg>
+      Cavalier
+    </button>
+    <button class="tab" role="tab" data-tab="queens" id="tab-queens" aria-selected="false">
+      <svg class="pc" viewBox="0 0 100 100" aria-hidden="true"><use href="#i-queen" width="100" height="100"/></svg>
+      Dames
+    </button>
+  </nav>
+
+  <!-- ======== ACCUEIL ======== -->
+  <section class="view" id="view-home" role="tabpanel" aria-labelledby="tab-home">
+    <div class="hero">
+      <p class="eyebrow">Casse-têtes d&rsquo;échecs</p>
+      <h1 class="big">Choisissez<br>votre défi</h1>
+    </div>
+    <div class="cards">
+      <button class="card" id="goKnight">
+        <span class="ico"><svg class="pc" viewBox="0 0 100 100" aria-hidden="true"><use href="#i-knight" width="100" height="100"/></svg></span>
+        <span class="txt">
+          <span class="ttl">Cavalier Solitaire</span>
+          <span class="desc">Visitez chaque case une seule fois, en sauts de cavalier. Onze plateaux et trois niveaux d&rsquo;aide.</span>
+          <span class="meta" id="metaKnight">0 / 11 plateaux</span>
+        </span>
+      </button>
+      <button class="card queens" id="goQueens">
+        <span class="ico"><svg class="pc" viewBox="0 0 100 100" aria-hidden="true"><use href="#i-queen" width="100" height="100"/></svg></span>
+        <span class="txt">
+          <span class="ttl">Dames en folie</span>
+          <span class="desc">Posez des dames sans qu&rsquo;aucune n&rsquo;en attaque une autre, du 4&times;4 au 10&times;10.</span>
+          <span class="meta" id="metaQueens">0 solutions trouvées</span>
+        </span>
+      </button>
+    </div>
+  </section>
+
+  <!-- ======== CAVALIER : CHOIX DU PLATEAU ======== -->
+  <section class="view" id="view-select" role="tabpanel" aria-labelledby="tab-knight" hidden>
+    <div class="hero">
+      <p class="eyebrow">Cavalier Solitaire</p>
+      <h1>Choisissez<br>un plateau</h1>
+      <p class="sub" style="margin-top:10px">Le cavalier saute en L. Visitez chaque case une seule fois.</p>
+    </div>
+    <div>
+      <p class="lab">Niveau d&rsquo;aide</p>
+      <div class="seg" id="kDiffSeg">
+        <button data-v="0" aria-pressed="false">Facile</button>
+        <button data-v="1" aria-pressed="true">Moyen</button>
+        <button data-v="2" aria-pressed="false">Difficile</button>
+      </div>
+      <p class="hint-note" id="kDiffNote"></p>
+    </div>
+    <div>
+      <p class="lab">Plateaux classiques</p>
+      <div class="lvls" id="lvlClassic"></div>
+    </div>
+    <div>
+      <p class="lab">Plateaux spéciaux</p>
+      <div class="lvls" id="lvlSpecial"></div>
+    </div>
+  </section>
+
+  <!-- ======== CAVALIER : PARTIE ======== -->
+  <section class="view" id="view-game" role="tabpanel" aria-labelledby="tab-knight" hidden>
+    <div class="gamebar">
+      <button class="back" id="kBack"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg>Plateaux</button>
+      <div class="chip" id="counter">0 / 64</div>
+    </div>
+    <div>
+      <h1 id="kTitle">Classique</h1>
+      <p class="sub" id="kSub" style="margin-top:6px"></p>
+    </div>
+    <p class="status" id="status" aria-live="polite"></p>
+    <div class="board-wrap" id="boardWrap">
+      <div class="board" id="board"></div>
+    </div>
+    <div class="controls">
+      <button class="action" id="undoBtn" disabled>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg>
+        Annuler
+      </button>
+      <button class="action" id="kHintBtn" hidden>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18h6"/><path d="M10 21h4"/><path d="M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.3 1 2.1h5c0-.8.4-1.6 1-2.1A6 6 0 0 0 12 3z"/></svg>
+        Indice
+      </button>
+      <button class="action primary" id="restartBtn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 3v6h-6"/></svg>
+        Recommencer
+      </button>
+    </div>
+    <div class="controls" id="nextRow" hidden>
+      <button class="action primary" id="nextBtn">Plateau suivant</button>
+    </div>
+    <details class="path">
+      <summary>
+        <svg class="chev" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>
+        <span id="pathLabel">Parcours (0)</span>
+      </summary>
+      <div class="path-list" id="pathList">&mdash;</div>
+    </details>
+    <footer class="rules" id="kRules"></footer>
+  </section>
+
+  <!-- ======== DAMES EN FOLIE ======== -->
+  <section class="view" id="view-queens" role="tabpanel" aria-labelledby="tab-queens" hidden>
+    <div class="gamebar">
+      <div>
+        <p class="eyebrow" style="margin-bottom:6px">Casse-tête</p>
+        <h1>Dames en folie</h1>
+      </div>
+      <div class="chip" id="qCounter">0 / 8</div>
+    </div>
+    <div>
+      <p class="lab">Taille de l&rsquo;échiquier (n&nbsp;&times;&nbsp;n)</p>
+      <div class="chips" id="qSizes"></div>
+    </div>
+    <p class="status" id="qStatus" aria-live="polite"></p>
+    <div class="board-wrap" id="qWrap">
+      <div class="board" id="qBoard"></div>
+    </div>
+    <div class="controls">
+      <button class="action" id="qClear">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 7h14"/><path d="M9 7V5h6v2"/><path d="M7 7l1 12h8l1-12"/></svg>
+        Effacer
+      </button>
+      <button class="action" id="qHint" hidden>Indice</button>
+      <button class="action primary" id="qNew" hidden>Nouvelle grille</button>
+    </div>
+    <div>
+      <p class="lab">Mode</p>
+      <div class="seg two" id="qModeSeg">
+        <button data-v="free" aria-pressed="true">Libre</button>
+        <button data-v="defi" aria-pressed="false">Défi</button>
+      </div>
+      <p class="hint-note" id="qModeNote"></p>
+    </div>
+    <div>
+      <p class="lab">Niveau d&rsquo;aide</p>
+      <div class="seg" id="qDiffSeg">
+        <button data-v="0" aria-pressed="false">Facile</button>
+        <button data-v="1" aria-pressed="true">Moyen</button>
+        <button data-v="2" aria-pressed="false">Difficile</button>
+      </div>
+      <p class="hint-note" id="qDiffNote"></p>
+    </div>
+    <div class="coll" id="qColl">
+      <div class="lab" style="margin:0">Solutions trouvées</div>
+      <div class="meter"><i id="qMeter"></i></div>
+      <span id="qCollText"></span>
+    </div>
+    <footer class="rules">
+      Une dame attaque toute sa ligne, toute sa colonne et ses deux diagonales. Il faut donc une dame par ligne et par colonne, et jamais deux sur la même diagonale.
+    </footer>
+  </section>
+
+</main>
+
+<script>
+/* ============================================================
+   MOTEUR : logique pure, sans aucun accès à la page.
+   (testé à part avec Node avant d'être intégré ici)
+   ============================================================ */
+var KNIGHT_OFFSETS = [[-2,-1],[-2,1],[-1,-2],[-1,2],[1,-2],[1,2],[2,-1],[2,1]];
+
+/* Graphe du cavalier sur un plateau rows x cols avec des cases bloquées.
+   Une case = un entier i = r*cols + c. */
+function makeGraph(rows, cols, blocked){
+  var n = rows*cols, free = [], adj = [], count = 0, i, k;
+  for(i=0;i<n;i++) free.push(true);
+  (blocked||[]).forEach(function(b){ free[b[0]*cols+b[1]] = false; });
+  for(i=0;i<n;i++){
+    adj.push([]);
+    if(!free[i]) continue;
+    count++;
+    var r = Math.floor(i/cols), c = i%cols;
+    for(k=0;k<8;k++){
+      var nr = r+KNIGHT_OFFSETS[k][0], nc = c+KNIGHT_OFFSETS[k][1];
+      if(nr>=0 && nr<rows && nc>=0 && nc<cols && free[nr*cols+nc]) adj[i].push(nr*cols+nc);
+    }
+  }
+  return { rows:rows, cols:cols, n:n, free:free, adj:adj, count:count };
+}
+
+function cellColor(g, i){ return (Math.floor(i/g.cols) + (i%g.cols)) % 2; }
+
+/* Condition NÉCESSAIRE pour pouvoir visiter toutes les cases restantes :
+   le cavalier change de couleur à chaque saut, donc les cases restantes
+   doivent alterner "couleur opposée, même couleur, opposée, ..." */
+function parityOK(g, vis, cur){
+  var m = 0, same = 0, opp = 0, cc = cellColor(g, cur), i;
+  for(i=0;i<g.n;i++){
+    if(g.free[i] && !vis[i]){
+      m++;
+      if(cellColor(g,i) === cc) same++; else opp++;
+    }
+  }
+  return opp === Math.ceil(m/2) && same === Math.floor(m/2);
+}
+
+/* Cherche une suite de coups qui amène le nombre de cases visitées à `target`.
+   vis0 : tableau 0/1 des cases déjà visitées (cur inclus), cnt0 : leur nombre.
+   Heuristique de Warnsdorff + retour arrière, avec un budget de nœuds. */
+function solve(g, vis0, cur, cnt0, target, budget, prune){
+  var vis = vis0.slice(), adj = g.adj, n = g.n, nodes = 0, aborted = false, path = [];
+  function avail(i){
+    var a = adj[i], d = 0, k;
+    for(k=0;k<a.length;k++) if(!vis[a[k]]) d++;
+    return d;
+  }
+  function deadEnd(c){
+    var ends = 0, i, k;
+    for(i=0;i<n;i++){
+      if(!g.free[i] || vis[i]) continue;
+      var d = avail(i), a = adj[i];
+      for(k=0;k<a.length;k++) if(a[k]===c){ d++; break; }
+      if(d===0) return true;
+      if(d===1){ ends++; if(ends>1) return true; }
+    }
+    return false;
+  }
+  function rec(c, cnt){
+    if(cnt >= target) return true;
+    if(++nodes > budget){ aborted = true; return false; }
+    if(prune && deadEnd(c)) return false;
+    var a = adj[c], scored = [], k, j;
+    for(k=0;k<a.length;k++) if(!vis[a[k]]) scored.push([avail(a[k]), a[k]]);
+    scored.sort(function(x,y){ return x[0]-y[0]; });
+    for(j=0;j<scored.length;j++){
+      var nb = scored[j][1];
+      vis[nb] = 1;
+      if(rec(nb, cnt+1)){ path.unshift(nb); return true; }
+      vis[nb] = 0;
+      if(aborted) return false;
+    }
+    return false;
+  }
+  var ok = rec(cur, cnt0);
+  return { status: ok ? 'found' : (aborted ? 'budget' : 'none'), path: path, nodes: nodes };
+}
+
+function emptyVis(g){
+  var v = [], i;
+  for(i=0;i<g.n;i++) v.push(0);
+  return v;
+}
+
+/* Cherche une case de départ qui permet de visiter `target` cases.
+   `order` : liste de cases à essayer (dans cet ordre). */
+function findStart(g, target, budget, prune, order){
+  for(var j=0;j<order.length;j++){
+    var s = order[j];
+    if(!g.free[s]) continue;
+    var vis = emptyVis(g);
+    vis[s] = 1;
+    if(prune && !parityOK(g, vis, s)) continue;
+    var res = solve(g, vis, s, 1, target, budget, prune);
+    if(res.status === 'found') return { start:s, path:[s].concat(res.path) };
+  }
+  return null;
+}
+
+/* Plus long parcours possible (recherche exhaustive : petits plateaux seulement). */
+function longestPath(g){
+  var best = 0, vis = emptyVis(g), adj = g.adj;
+  function dfs(c, len){
+    if(len > best) best = len;
+    if(best === g.count) return;
+    var a = adj[c];
+    for(var k=0;k<a.length;k++){
+      var nb = a[k];
+      if(!vis[nb]){
+        vis[nb] = 1; dfs(nb, len+1); vis[nb] = 0;
+        if(best === g.count) return;
+      }
+    }
+  }
+  for(var s=0;s<g.n;s++){
+    if(!g.free[s]) continue;
+    vis[s] = 1; dfs(s, 1); vis[s] = 0;
+  }
+  return best;
+}
+
+/* ---------- Les plateaux du Cavalier ---------- */
+/* Cases bloquées : liste de rectangles [r1,r2,c1,c2] (bornes incluses). */
+function rectsBlocked(rects){
+  var out = [];
+  rects.forEach(function(R){
+    for(var r=R[0]; r<=R[1]; r++) for(var c=R[2]; c<=R[3]; c++) out.push([r,c]);
+  });
+  return out;
+}
+/* Cases bloquées : tout ce qui est à plus de `rad` du centre (distance de Manhattan). */
+function diamondBlocked(n, rad){
+  var out = [], m = (n-1)/2;
+  for(var r=0;r<n;r++) for(var c=0;c<n;c++){
+    if(Math.abs(r-m) + Math.abs(c-m) > rad) out.push([r,c]);
+  }
+  return out;
+}
+
+var LEVELS = [
+  { id:'k3x4', name:'Mini', rows:3, cols:4, blocked:[], goal:'full', group:'classic',
+    note:'12 cases : un bon échauffement.' },
+  { id:'k4x4', name:'Impossible ?', rows:4, cols:4, blocked:[], goal:'max', group:'classic',
+    note:'Aucun parcours ne passe par les 16 cases. Trouvez le plus long possible.' },
+  { id:'k4x5', name:'Couloir', rows:4, cols:5, blocked:[], goal:'full', group:'classic',
+    note:'20 cases, plus étroit qu’il n’y paraît.' },
+  { id:'k5x5', name:'Cinq par cinq', rows:5, cols:5, blocked:[], goal:'full', group:'classic',
+    note:'25 cases. Toutes les cases de départ ne conviennent pas !' },
+  { id:'k6x6', name:'Six par six', rows:6, cols:6, blocked:[], goal:'full', group:'classic',
+    note:'36 cases.' },
+  { id:'k7x7', name:'Sept par sept', rows:7, cols:7, blocked:[], goal:'full', group:'classic',
+    note:'49 cases. Le choix du départ est décisif.' },
+  { id:'k8x8', name:'Classique', rows:8, cols:8, blocked:[], goal:'full', group:'classic',
+    note:'Les 64 cases de l’échiquier.' },
+  /* Plateaux spéciaux : des cases manquent. Tous vérifiés avec le solveur. */
+  { id:'kcroix', name:'Croix', rows:8, cols:8, goal:'full', group:'special',
+    blocked: rectsBlocked([[0,1,0,1],[0,1,6,7],[6,7,0,1],[6,7,6,7]]),
+    note:'Un échiquier aux quatre coins coupés : 48 cases.' },
+  { id:'klosange', name:'Losange', rows:8, cols:8, goal:'full', group:'special',
+    blocked: diamondBlocked(8, 5),
+    note:'Un plateau en forme de diamant : 52 cases.' },
+  { id:'kcratere', name:'Cratère', rows:8, cols:8, goal:'full', group:'special',
+    blocked: rectsBlocked([[3,4,3,4]]),
+    note:'Un trou au milieu de l’échiquier : 60 cases.' },
+  { id:'kescalier', name:'Escalier', rows:7, cols:7, goal:'full', group:'special',
+    blocked: [[0,4],[0,5],[0,6],[1,5],[1,6],[2,6]],
+    note:'43 cases en escalier. Attention aux couleurs : le départ compte !' }
+];
+
+/* ---------- Dames en folie ---------- */
+/* Nombre total de solutions du problème des n dames (rotations et symétries comptées à part). */
+var QUEEN_SOLUTIONS = { 4:2, 5:10, 6:4, 7:40, 8:92, 9:352, 10:724 };
+
+function queensAttack(a, b){
+  return a[0]===b[0] || a[1]===b[1] || Math.abs(a[0]-b[0]) === Math.abs(a[1]-b[1]);
+}
+
+/* Dames en conflit : bad[i] vrai si la dame i en attaque une autre. */
+function queenConflicts(queens){
+  var bad = [], pairs = 0, i, j;
+  for(i=0;i<queens.length;i++) bad.push(false);
+  for(i=0;i<queens.length;i++){
+    for(j=i+1;j<queens.length;j++){
+      if(queensAttack(queens[i], queens[j])){ bad[i] = true; bad[j] = true; pairs++; }
+    }
+  }
+  return { bad:bad, pairs:pairs };
+}
+
+/* Cases attaquées par au moins une dame (hors la case de la dame elle-même). */
+function queenAttacked(n, queens){
+  var att = [], i, r, c;
+  for(i=0;i<n*n;i++) att.push(false);
+  queens.forEach(function(q){
+    for(r=0;r<n;r++) for(c=0;c<n;c++){
+      if((r!==q[0] || c!==q[1]) && queensAttack(q, [r,c])) att[r*n+c] = true;
+    }
+  });
+  return att;
+}
+
+function shuffled(arr){
+  var a = arr.slice(), i, j, t;
+  for(i=a.length-1;i>0;i--){ j = Math.floor(Math.random()*(i+1)); t = a[i]; a[i] = a[j]; a[j] = t; }
+  return a;
+}
+
+/* Complète des dames déjà posées en une solution complète (une dame par ligne).
+   Renvoie la liste [[r,c],...] ou null si c'est impossible. */
+function completeQueens(n, fixed, randomize){
+  var rowQ = [], cols = [], d1 = [], d2 = [], i;
+  for(i=0;i<n;i++){ rowQ.push(-1); cols.push(false); }
+  for(i=0;i<2*n;i++){ d1.push(false); d2.push(false); }
+  for(i=0;i<fixed.length;i++){
+    var r = fixed[i][0], c = fixed[i][1];
+    if(rowQ[r] !== -1 || cols[c] || d1[r+c] || d2[r-c+n]) return null;
+    rowQ[r] = c; cols[c] = true; d1[r+c] = true; d2[r-c+n] = true;
+  }
+  var base = [];
+  for(i=0;i<n;i++) base.push(i);
+  function rec(r){
+    if(r === n) return true;
+    if(rowQ[r] !== -1) return rec(r+1);
+    var order = randomize ? shuffled(base) : base;
+    for(var j=0;j<n;j++){
+      var c = order[j];
+      if(!cols[c] && !d1[r+c] && !d2[r-c+n]){
+        rowQ[r] = c; cols[c] = true; d1[r+c] = true; d2[r-c+n] = true;
+        if(rec(r+1)) return true;
+        rowQ[r] = -1; cols[c] = false; d1[r+c] = false; d2[r-c+n] = false;
+      }
+    }
+    return false;
+  }
+  if(!rec(0)) return null;
+  return rowQ.map(function(c, r){ return [r, c]; });
+}
+
+/* Pour les tests : compte toutes les solutions. */
+function countQueenSolutions(n){
+  var cols = [], d1 = [], d2 = [], i, total = 0;
+  for(i=0;i<n;i++) cols.push(false);
+  for(i=0;i<2*n;i++){ d1.push(false); d2.push(false); }
+  function rec(r){
+    if(r === n){ total++; return; }
+    for(var c=0;c<n;c++){
+      if(!cols[c] && !d1[r+c] && !d2[r-c+n]){
+        cols[c] = d1[r+c] = d2[r-c+n] = true;
+        rec(r+1);
+        cols[c] = d1[r+c] = d2[r-c+n] = false;
+      }
+    }
+  }
+  rec(0);
+  return total;
+}
+
+if(typeof module !== 'undefined' && module.exports){
+  module.exports = { KNIGHT_OFFSETS:KNIGHT_OFFSETS, makeGraph:makeGraph, cellColor:cellColor, parityOK:parityOK,
+    solve:solve, emptyVis:emptyVis, findStart:findStart, longestPath:longestPath, LEVELS:LEVELS,
+    QUEEN_SOLUTIONS:QUEEN_SOLUTIONS, queenConflicts:queenConflicts, queenAttacked:queenAttacked,
+    completeQueens:completeQueens, countQueenSolutions:countQueenSolutions };
+}
+
+</script>
 <script>
 (function(){
   'use strict';
-  var N = 8;
-  var STORAGE_KEY = 'cavalier-solitaire-state-v1';
-  var FILES = 'abcdefgh';
-  var KNIGHT_OFFSETS = [[-2,-1],[-2,1],[-1,-2],[-1,2],[1,-2],[1,2],[2,-1],[2,1]];
 
-  var boardEl = document.getElementById('board');
-  var boardWrapEl = document.getElementById('boardWrap');
-  var knightEl = document.getElementById('knight');
-  var counterEl = document.getElementById('counter');
-  var statusEl = document.getElementById('status');
-  var undoBtn = document.getElementById('undoBtn');
-  var restartBtn = document.getElementById('restartBtn');
-  var pathListEl = document.getElementById('pathList');
-  var pathLabelEl = document.getElementById('pathLabel');
+  var SAVE_KEY = 'cavalier-solitaire-state-v2';
+  var OLD_KEY  = 'cavalier-solitaire-state-v1';
+  var FILES = 'abcdefghij';
+  var DIFF_NAMES = ['Facile', 'Moyen', 'Difficile'];
+  var K_DIFF_NOTES = [
+    'Coups possibles marqués avec le nombre de sorties de chaque case, bouton Indice, et alerte si le départ est sans issue.',
+    'Les coups possibles sont marqués d’un point.',
+    'Aucune aide : à vous de repérer les sauts du cavalier.'
+  ];
+  var Q_DIFF_NOTES = [
+    'Cases attaquées hachurées, dames en conflit en rouge, et un bouton Indice.',
+    'Les dames en conflit sont signalées en rouge.',
+    'Aucun signalement : appuyez sur Vérifier pour contrôler vos dames.'
+  ];
+  var Q_MODE_NOTES = {
+    free: 'Posez toutes les dames vous-même et collectionnez les solutions différentes.',
+    defi: 'Des dames sont déjà fixées (point blanc) : complétez la grille.'
+  };
+  var QUEEN_SVG = '<svg class="pc" viewBox="0 0 100 100" aria-hidden="true"><use href="#i-queen" width="100" height="100"/></svg>';
+  var KNIGHT_SVG = '<svg class="pc" viewBox="0 0 100 100" aria-hidden="true"><use href="#i-knight" width="100" height="100"/></svg>';
 
-  var squareEls = [];
-  var state = null;
-
-  function idx(r,c){ return r*N+c; }
-  function squareName(r,c){ return FILES[c] + (N-r); }
-
-  function freshState(){
-    return { board:new Array(N*N).fill(0), history:[], knight:null, phase:'idle' };
+  function $(id){ return document.getElementById(id); }
+  function el(tag, cls, html){
+    var e = document.createElement(tag);
+    if(cls) e.className = cls;
+    if(html != null) e.innerHTML = html;
+    return e;
+  }
+  function isObj(o){ return o && typeof o === 'object' && !Array.isArray(o); }
+  function levelById(id){
+    for(var i=0;i<LEVELS.length;i++) if(LEVELS[i].id === id) return LEVELS[i];
+    return null;
   }
 
-  function sanitize(d){
-    return {
-      board: d.board.slice(0, N*N),
-      history: Array.isArray(d.history) ? d.history.slice() : [],
-      knight: d.knight ? { r:d.knight.r, c:d.knight.c } : null,
-      phase: d.phase || 'idle'
-    };
+  /* ============================================================
+     Sauvegarde (localStorage)
+     ============================================================ */
+  function defaultSave(){
+    return { tab:'home', kScreen:'select', kLevel:null, kDiff:1, kGames:{}, kDone:{},
+             qN:8, qDiff:1, qMode:'free', qBoards:{}, qFound:{} };
   }
-
-  function loadFromStorageOrFresh(){
+  function loadSave(){
+    var s = defaultSave();
     try{
-      var raw = localStorage.getItem(STORAGE_KEY);
+      var raw = localStorage.getItem(SAVE_KEY);
       if(raw){
-        var parsed = JSON.parse(raw);
-        if(Array.isArray(parsed.board) && parsed.board.length === N*N) return sanitize(parsed);
+        var p = JSON.parse(raw);
+        if(isObj(p)){
+          if(['home','knight','queens'].indexOf(p.tab) >= 0) s.tab = p.tab;
+          if(p.kScreen === 'game') s.kScreen = 'game';
+          if(typeof p.kLevel === 'string' && levelById(p.kLevel)) s.kLevel = p.kLevel;
+          if(p.kDiff === 0 || p.kDiff === 1 || p.kDiff === 2) s.kDiff = p.kDiff;
+          if(isObj(p.kGames)) s.kGames = p.kGames;
+          if(isObj(p.kDone)) s.kDone = p.kDone;
+          if(typeof p.qN === 'number' && p.qN >= 4 && p.qN <= 10) s.qN = Math.floor(p.qN);
+          if(p.qDiff === 0 || p.qDiff === 1 || p.qDiff === 2) s.qDiff = p.qDiff;
+          if(p.qMode === 'free' || p.qMode === 'defi') s.qMode = p.qMode;
+          if(isObj(p.qBoards)) s.qBoards = p.qBoards;
+          if(isObj(p.qFound)) s.qFound = p.qFound;
+        }
+      } else {
+        /* Première visite depuis la nouvelle version : on reprend l'ancienne partie 8x8. */
+        var old = localStorage.getItem(OLD_KEY);
+        if(old){
+          var o = JSON.parse(old);
+          if(o && Array.isArray(o.history) && o.history.length && Array.isArray(o.board) && o.board.length === 64){
+            s.kGames.k8x8 = o.history.map(function(h){ return h.r*8 + h.c; });
+          }
+        }
       }
     }catch(e){}
-    return freshState();
+    if(s.kScreen === 'game' && !levelById(s.kLevel)) s.kScreen = 'select';
+    return s;
   }
-
+  var save = loadSave();
   function persist(){
-    try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }catch(e){}
+    try{ localStorage.setItem(SAVE_KEY, JSON.stringify(save)); }catch(e){}
   }
 
-  function getSnapshot(){ return state; }
+  /* ============================================================
+     Onglets et vues
+     ============================================================ */
+  var tabBtns = Array.prototype.slice.call(document.querySelectorAll('button.tab'));
 
-  function legalMovesFrom(r,c,board){
-    var out = [];
-    for(var i=0;i<KNIGHT_OFFSETS.length;i++){
-      var nr = r+KNIGHT_OFFSETS[i][0], nc = c+KNIGHT_OFFSETS[i][1];
-      if(nr>=0 && nr<N && nc>=0 && nc<N && board[idx(nr,nc)]===0) out.push([nr,nc]);
+  function currentView(){
+    if(save.tab === 'home') return 'home';
+    if(save.tab === 'queens') return 'queens';
+    return (save.kScreen === 'game' && levelById(save.kLevel)) ? 'game' : 'select';
+  }
+
+  function showTab(){
+    var view = currentView();
+    document.body.setAttribute('data-tab', save.tab === 'queens' ? 'queens' : 'knight');
+    tabBtns.forEach(function(b){
+      b.setAttribute('aria-selected', b.getAttribute('data-tab') === save.tab ? 'true' : 'false');
+    });
+    ['home','select','game','queens'].forEach(function(n){ $('view-'+n).hidden = (n !== view); });
+    $('decoHome').hidden = (view !== 'home');
+    $('decoKnight').hidden = (view !== 'select');
+    $('decoQueens').hidden = (view !== 'queens');
+    if(view === 'home') renderHome();
+    else if(view === 'select') renderSelect();
+    else if(view === 'game'){
+      if(!K.L || K.L.id !== save.kLevel) loadLevel(save.kLevel);
+      renderKnight();
+    } else renderQueens();
+  }
+
+  function goTab(t){
+    save.tab = t;
+    persist();
+    showTab();
+    window.scrollTo(0, 0);
+  }
+
+  function setPressed(container, attr, value){
+    Array.prototype.forEach.call(container.querySelectorAll('button'), function(b){
+      b.setAttribute('aria-pressed', String(b.getAttribute(attr)) === String(value) ? 'true' : 'false');
+    });
+  }
+
+  /* ============================================================
+     Accueil
+     ============================================================ */
+  function renderHome(){
+    var done = 0;
+    LEVELS.forEach(function(L){ if(save.kDone[L.id]) done++; });
+    $('metaKnight').textContent = done + ' / ' + LEVELS.length + ' plateaux terminés';
+    var found = 0;
+    Object.keys(save.qFound).forEach(function(n){
+      if(Array.isArray(save.qFound[n])) found += save.qFound[n].length;
+    });
+    $('metaQueens').textContent = found === 0 ? 'Aucune solution trouvée'
+      : found + (found > 1 ? ' solutions trouvées' : ' solution trouvée');
+  }
+
+  /* ============================================================
+     CAVALIER : choix du plateau
+     ============================================================ */
+  var graphCache = {}, maxCache = {};
+  function graphOf(L){
+    if(!graphCache[L.id]) graphCache[L.id] = makeGraph(L.rows, L.cols, L.blocked || []);
+    return graphCache[L.id];
+  }
+  function targetOf(L){
+    var g = graphOf(L);
+    if(L.goal !== 'max') return g.count;
+    if(maxCache[L.id] == null) maxCache[L.id] = longestPath(g);
+    return maxCache[L.id];
+  }
+
+  function previewSVG(L){
+    var s = 10, out = '<svg viewBox="0 0 ' + (L.cols*s) + ' ' + (L.rows*s) + '" aria-hidden="true">';
+    var g = graphOf(L);
+    for(var r=0;r<L.rows;r++) for(var c=0;c<L.cols;c++){
+      if(!g.free[r*L.cols+c]) continue;
+      out += '<rect x="' + (c*s+.6) + '" y="' + (r*s+.6) + '" width="' + (s-1.2) + '" height="' + (s-1.2) +
+             '" rx="1.6" fill="' + (((r+c)%2===0) ? '#dddbd4' : '#4a4950') + '"/>';
+    }
+    return out + '</svg>';
+  }
+
+  function levelCard(L){
+    var g = graphOf(L), target = targetOf(L);
+    var done = save.kDone[L.id] || 0;
+    var prog = Array.isArray(save.kGames[L.id]) ? save.kGames[L.id].length : 0;
+    var state = '';
+    if(done) state = '<span class="stars" aria-label="terminé en ' + DIFF_NAMES[done-1].toLowerCase() + '">' +
+                     '★★★'.slice(0, done) + '☆☆☆'.slice(0, 3-done) + '</span>';
+    else if(prog > 0) state = prog + '/' + target;
+    var b = el('button', 'lvl',
+      '<span class="prev">' + previewSVG(L) + '</span>' +
+      '<span><span class="nm">' + L.name + (L.goal === 'max' ? '<span class="tag">défi</span>' : '') + '</span>' +
+      '<span class="dsc">' + L.rows + '×' + L.cols + ' · ' + g.count + ' cases</span></span>' +
+      '<span class="state">' + state + '</span>');
+    b.type = 'button';
+    b.addEventListener('click', function(){ openLevel(L.id); });
+    return b;
+  }
+
+  function renderSelect(){
+    setPressed($('kDiffSeg'), 'data-v', save.kDiff);
+    $('kDiffNote').textContent = K_DIFF_NOTES[save.kDiff];
+    [['lvlClassic','classic'], ['lvlSpecial','special']].forEach(function(pair){
+      var box = $(pair[0]);
+      box.innerHTML = '';
+      LEVELS.forEach(function(L){ if(L.group === pair[1]) box.appendChild(levelCard(L)); });
+    });
+  }
+
+  /* ============================================================
+     CAVALIER : la partie
+     ============================================================ */
+  var knightEl = el('div', 'knight', KNIGHT_SVG);
+  var K = { L:null, g:null, target:0, hist:[], phase:'idle', squares:[], hintIdx:-1, tmpMsg:'', warnCache:{}, snap:true };
+
+  var PARITY_MSG = 'Attention : depuis cette case, aucun parcours complet n’existe. Le cavalier change de couleur à chaque saut, donc le départ compte. Annulez et repartez d’ailleurs.';
+  var NONE_MSG   = 'Attention : depuis cette case de départ, aucun parcours complet n’existe. Annulez et repartez d’ailleurs.';
+
+  function sanitizeHistory(arr, g){
+    var out = [], seen = {};
+    if(!Array.isArray(arr)) return out;
+    for(var j=0;j<arr.length;j++){
+      var v = arr[j];
+      if(typeof v !== 'number' || v < 0 || v >= g.n || !g.free[v] || seen[v]) break;
+      if(out.length && g.adj[out[out.length-1]].indexOf(v) < 0) break;
+      out.push(v); seen[v] = 1;
     }
     return out;
   }
 
-  function computePhase(){
-    if(state.history.length === N*N) return 'won';
-    var legal = legalMovesFrom(state.knight.r, state.knight.c, state.board);
-    return legal.length ? 'playing' : 'stuck';
+  function loadLevel(id){
+    var L = levelById(id);
+    K.L = L; K.g = graphOf(L); K.target = targetOf(L);
+    K.hist = sanitizeHistory(save.kGames[id], K.g);
+    K.hintIdx = -1; K.tmpMsg = ''; K.warnCache = {};
+    buildKnightBoard();
   }
 
-  function buildBoard(){
-    for(var r=0;r<N;r++){
-      for(var c=0;c<N;c++){
-        var sq = document.createElement('div');
-        sq.className = 'sq ' + (((r+c)%2===0) ? 'light' : 'dark');
-        sq.dataset.r = r;
-        sq.dataset.c = c;
-        sq.setAttribute('role','button');
-        sq.setAttribute('tabindex','0');
+  function openLevel(id){
+    save.kLevel = id; save.kScreen = 'game'; save.tab = 'knight';
+    persist();
+    loadLevel(id);
+    showTab();
+    window.scrollTo(0, 0);
+  }
 
-        var order = document.createElement('span');
-        order.className = 'order';
-        sq.appendChild(order);
-
-        if(c===0){
-          var rank = document.createElement('span');
-          rank.className = 'rank';
-          rank.textContent = String(N-r);
-          sq.appendChild(rank);
+  function buildKnightBoard(){
+    var g = K.g, board = $('board');
+    board.innerHTML = '';
+    K.squares = [];
+    board.style.gridTemplateColumns = 'repeat(' + g.cols + ',1fr)';
+    $('boardWrap').style.setProperty('--cols', g.cols);
+    /* Étiquettes : numéro sur la première case libre de chaque ligne,
+       lettre sur la dernière case libre de chaque colonne (utile quand il y a des trous). */
+    var firstCol = [], lastRow = [], rr, cc;
+    for(rr=0;rr<g.rows;rr++) for(cc=g.cols-1;cc>=0;cc--) if(g.free[rr*g.cols+cc]) firstCol[rr] = cc;
+    for(cc=0;cc<g.cols;cc++) for(rr=0;rr<g.rows;rr++) if(g.free[rr*g.cols+cc]) lastRow[cc] = rr;
+    for(var r=0;r<g.rows;r++){
+      for(var c=0;c<g.cols;c++){
+        var i = r*g.cols + c;
+        var sq = el('div', 'sq k ' + (((r+c)%2 === 0) ? 'light' : 'dark'));
+        sq.setAttribute('data-i', i);
+        if(!g.free[i]){
+          sq.className += ' blocked';
+          sq.setAttribute('aria-hidden', 'true');
+        } else {
+          sq.setAttribute('role', 'button');
+          sq.setAttribute('tabindex', '0');
+          sq.appendChild(el('span', 'order'));
+          sq.appendChild(el('span', 'dot'));
+          if(c === firstCol[r]) sq.appendChild(el('span', 'rank', String(g.rows - r)));
+          if(r === lastRow[c])  sq.appendChild(el('span', 'file', FILES[c]));
         }
-        if(r===N-1){
-          var file = document.createElement('span');
-          file.className = 'file';
-          file.textContent = FILES[c];
-          sq.appendChild(file);
-        }
-
-        boardEl.appendChild(sq);
-        squareEls[idx(r,c)] = sq;
+        board.appendChild(sq);
+        K.squares[i] = sq;
       }
     }
+    board.appendChild(knightEl);
+    knightEl.classList.remove('placed');
+    K.snap = true;
   }
 
-  function positionKnightTo(r,c){
-    var target = squareEls[idx(r,c)];
-    knightEl.style.left = target.offsetLeft + 'px';
-    knightEl.style.top = target.offsetTop + 'px';
-    knightEl.style.width = target.offsetWidth + 'px';
-    knightEl.style.height = target.offsetHeight + 'px';
+  function squareName(i){
+    var g = K.g, r = Math.floor(i/g.cols), c = i % g.cols;
+    return FILES[c] + (g.rows - r);
   }
 
+  function positionKnightTo(i){
+    var t = K.squares[i];
+    knightEl.style.left = t.offsetLeft + 'px';
+    knightEl.style.top = t.offsetTop + 'px';
+    knightEl.style.width = t.offsetWidth + 'px';
+    knightEl.style.height = t.offsetHeight + 'px';
+  }
   function bounceKnight(){
     knightEl.classList.remove('landed');
     void knightEl.offsetWidth;
     knightEl.classList.add('landed');
   }
-
   function flashInvalid(i){
-    var el = squareEls[i];
-    el.classList.remove('invalid');
-    void el.offsetWidth;
-    el.classList.add('invalid');
+    var sq = K.squares[i];
+    sq.classList.remove('invalid');
+    void sq.offsetWidth;
+    sq.classList.add('invalid');
   }
 
-  function afterChange(bounce){
-    render();
+  function colorTip(L, g){
+    if(L.goal !== 'full') return '';
+    var cnt = [0, 0], i;
+    for(i=0;i<g.n;i++) if(g.free[i]) cnt[cellColor(g, i)]++;
+    if(Math.abs(cnt[0] - cnt[1]) !== 1) return '';
+    var big = cnt[0] > cnt[1] ? 0 : 1;
+    return 'Astuce : le cavalier change de couleur à chaque saut. Il y a ' + Math.max(cnt[0], cnt[1]) +
+           ' cases ' + (big === 0 ? 'claires' : 'foncées') + ' et ' + Math.min(cnt[0], cnt[1]) +
+           ' cases ' + (big === 0 ? 'foncées' : 'claires') + ' : pour tout visiter, il faut partir d’une case ' +
+           (big === 0 ? 'claire' : 'foncée') + '.';
+  }
+
+  function startWarning(s){
+    if(K.warnCache[s] !== undefined) return K.warnCache[s];
+    var g = K.g, vis = emptyVis(g), w = '';
+    vis[s] = 1;
+    if(!parityOK(g, vis, s)) w = PARITY_MSG;
+    else if(solve(g, vis, s, 1, K.target, 40000, true).status === 'none') w = NONE_MSG;
+    K.warnCache[s] = w;
+    return w;
+  }
+
+  function renderKnight(){
+    var L = K.L, g = K.g, hist = K.hist, diff = save.kDiff, i;
+    var vis = emptyVis(g), ord = [];
+    hist.forEach(function(v, j){ vis[v] = 1; ord[v] = j + 1; });
+    var cur = hist.length ? hist[hist.length-1] : -1;
+    var legal = cur >= 0 ? g.adj[cur].filter(function(x){ return !vis[x]; }) : [];
+    K.phase = hist.length === 0 ? 'idle' : hist.length >= K.target ? 'won' : legal.length === 0 ? 'stuck' : 'playing';
+
+    var showDots = diff <= 1 && K.phase === 'playing';
+    var legalSet = {};
+    if(showDots) legal.forEach(function(x){ legalSet[x] = true; });
+    var visited = hist.length;
+
+    for(i=0;i<g.n;i++){
+      if(!g.free[i]) continue;
+      var sq = K.squares[i], v = ord[i] || 0;
+      if(v > 0){
+        sq.style.background = 'rgba(79,143,230,' + (0.18 + 0.6 * (v / Math.max(visited, 1))).toFixed(3) + ')';
+      } else sq.style.background = '';
+      sq.querySelector('.order').textContent = v > 0 ? v : '';
+      var isLegal = !!legalSet[i];
+      sq.classList.toggle('legal', isLegal);
+      sq.classList.toggle('nocount', diff !== 0);
+      sq.classList.toggle('current', i === cur);
+      sq.classList.toggle('hint', i === K.hintIdx);
+      if(isLegal && diff === 0){
+        var out = 0, a = g.adj[i];
+        for(var k=0;k<a.length;k++) if(!vis[a[k]]) out++;
+        sq.querySelector('.dot').textContent = out;
+      } else sq.querySelector('.dot').textContent = '';
+      var label = squareName(i);
+      if(v > 0) label += ', visitée, coup ' + v;
+      else if(isLegal) label += ', coup possible';
+      sq.setAttribute('aria-label', label);
+    }
+
+    if(cur >= 0){
+      if(K.snap || !knightEl.classList.contains('placed')){
+        knightEl.style.transition = 'none';
+        knightEl.classList.add('placed');
+        positionKnightTo(cur);
+        void knightEl.offsetWidth;
+        knightEl.style.transition = '';
+        K.snap = false;
+      } else positionKnightTo(cur);
+    } else knightEl.classList.remove('placed');
+
+    /* Textes */
+    $('counter').textContent = visited + ' / ' + K.target;
+    $('kTitle').textContent = L.name;
+    $('kSub').textContent = L.rows + '×' + L.cols + ' · ' + DIFF_NAMES[diff];
+    var warn = (diff === 0 && L.goal === 'full' && hist.length > 0) ? startWarning(hist[0]) : '';
+    var text = '', cls = '';
+    if(K.phase === 'won'){
+      text = L.goal === 'max'
+        ? 'Record atteint : ' + K.target + ' cases, c’est le maximum possible !'
+        : 'Parcours complet ! Les ' + K.target + ' cases sont visitées.';
+      cls = 'won';
+    } else if(K.tmpMsg){
+      text = K.tmpMsg;
+    } else if(K.phase === 'idle'){
+      text = 'Touchez une case pour placer le cavalier.' +
+             (L.goal === 'max' ? ' Objectif : ' + K.target + ' cases, le maximum possible.' : '');
+    } else if(warn){
+      text = warn; cls = 'stuck';
+    } else if(K.phase === 'stuck'){
+      text = L.goal === 'max'
+        ? 'Plus de coup possible : ' + visited + ' cases sur ' + K.target + ' possibles. Annulez ou recommencez.'
+        : 'Plus aucun coup possible. Annulez ou recommencez.';
+      cls = 'stuck';
+    }
+    var st = $('status');
+    st.textContent = text;
+    st.className = 'status' + (cls ? ' ' + cls : '');
+    $('boardWrap').classList.toggle('won', K.phase === 'won');
+
+    $('undoBtn').disabled = hist.length === 0;
+    $('kHintBtn').hidden = diff !== 0;
+    $('kHintBtn').disabled = K.phase === 'won';
+
+    var next = null;
+    for(i=0;i<LEVELS.length;i++) if(LEVELS[i].id === L.id && LEVELS[i+1]) next = LEVELS[i+1];
+    $('nextRow').hidden = K.phase !== 'won';
+    $('nextBtn').textContent = next ? 'Plateau suivant : ' + next.name : 'Retour aux plateaux';
+
+    var names = hist.map(squareName);
+    $('pathLabel').textContent = 'Parcours (' + names.length + ')';
+    if(!names.length) $('pathList').textContent = '—';
+    else {
+      var head = names.slice(0, -1).join(' → ');
+      $('pathList').innerHTML = (head ? head + ' → ' : '') + '<span>' + names[names.length-1] + '</span>';
+    }
+
+    var rules = 'Le cavalier se déplace en L : deux cases dans un sens, une case perpendiculairement. ' + L.note;
+    var tip = diff <= 1 ? colorTip(L, g) : '';
+    $('kRules').textContent = rules + (tip ? ' ' + tip : '');
+  }
+
+  function afterK(bounce){
+    K.tmpMsg = '';
+    K.hintIdx = -1;
+    if(K.hist.length) save.kGames[K.L.id] = K.hist.slice(); else delete save.kGames[K.L.id];
     persist();
+    renderKnight();
     if(bounce) bounceKnight();
   }
 
-  function placeKnight(r,c){
-    state.board = new Array(N*N).fill(0);
-    state.board[idx(r,c)] = 1;
-    state.knight = {r:r,c:c};
-    state.history = [{r:r,c:c}];
-    state.phase = computePhase();
-    afterChange(true);
+  function onKSquare(i){
+    var g = K.g;
+    if(!g.free[i] || K.phase === 'won') return;
+    if(K.hist.length === 0){ K.hist = [i]; afterK(true); return; }
+    var cur = K.hist[K.hist.length-1];
+    if(g.adj[cur].indexOf(i) >= 0 && K.hist.indexOf(i) < 0){
+      K.hist.push(i);
+      if(K.hist.length >= K.target){
+        var prev = save.kDone[K.L.id] || 0;
+        save.kDone[K.L.id] = Math.max(prev, save.kDiff + 1);
+      }
+      afterK(true);
+    } else flashInvalid(i);
   }
 
-  function moveKnight(r,c){
-    var order = state.history.length+1;
-    state.board[idx(r,c)] = order;
-    state.knight = {r:r,c:c};
-    state.history.push({r:r,c:c});
-    state.phase = computePhase();
-    afterChange(true);
+  function kUndo(){
+    if(!K.hist.length) return;
+    K.hist.pop();
+    if(!K.hist.length) K.snap = true;
+    afterK(false);
+  }
+  function kRestart(){
+    K.hist = [];
+    K.snap = true;
+    afterK(false);
   }
 
-  function undo(){
-    if(state.history.length===0) return;
-    var last = state.history.pop();
-    state.board[idx(last.r,last.c)] = 0;
-    if(state.history.length===0){
-      state.knight = null;
-      state.phase = 'idle';
+  function kHint(){
+    if(K.phase === 'won') return;
+    var g = K.g, hist = K.hist, goalFull = K.L.goal === 'full', i;
+    K.tmpMsg = ''; K.hintIdx = -1;
+    var vis = emptyVis(g);
+    hist.forEach(function(v){ vis[v] = 1; });
+    if(hist.length === 0){
+      var order = [];
+      for(i=0;i<g.n;i++) if(g.free[i]) order.push(i);
+      var found = findStart(g, K.target, 60000, goalFull, shuffled(order));
+      if(found){ K.hintIdx = found.start; K.tmpMsg = 'Une bonne case de départ est marquée.'; }
+      else K.tmpMsg = 'Je n’ai pas trouvé de bonne case de départ.';
     } else {
-      var prev = state.history[state.history.length-1];
-      state.knight = {r:prev.r,c:prev.c};
-      state.phase = computePhase();
+      var cur = hist[hist.length-1];
+      var res = solve(g, vis, cur, hist.length, K.target, 120000, goalFull);
+      if(res.status === 'found' && res.path.length){
+        K.hintIdx = res.path[0];
+        K.tmpMsg = 'Un bon coup est marqué.';
+      } else if(res.status === 'none'){
+        K.tmpMsg = goalFull
+          ? 'Plus aucun parcours complet n’est possible depuis ici. Annulez quelques coups.'
+          : 'Le record n’est plus atteignable depuis ici. Annulez quelques coups.';
+      } else {
+        var legal = g.adj[cur].filter(function(x){ return !vis[x]; }), best = -1, bd = 99;
+        legal.forEach(function(x){
+          var d = 0;
+          g.adj[x].forEach(function(y){ if(!vis[y]) d++; });
+          if(d < bd){ bd = d; best = x; }
+        });
+        if(best >= 0){ K.hintIdx = best; K.tmpMsg = 'Piste (non garantie) : la case qui laisse le moins de sorties est marquée.'; }
+        else K.tmpMsg = 'Plus aucun coup possible. Annulez.';
+      }
     }
-    afterChange(false);
+    renderKnight();
   }
 
-  function restart(){
-    state = freshState();
-    afterChange(false);
+  /* ============================================================
+     DAMES EN FOLIE
+     ============================================================ */
+  var Q = { built:0, squares:[], tmpMsg:'', hintIdx:-1, reveal:false, revealTimer:null, winMsg:'', queens:[] };
+
+  function qKey(){ return save.qMode + save.qN; }
+
+  function genDefi(n){
+    var sol = completeQueens(n, [], true);
+    var k = Math.max(1, Math.round(n / 3)), rows = [], r;
+    for(r=0;r<n;r++) rows.push(r);
+    return shuffled(rows).slice(0, k).map(function(row){ return [row, sol[row][1], 1]; });
   }
 
-  function onSquareClick(r,c){
-    if(state.phase === 'won') return;
-    var i = idx(r,c);
-    if(state.phase === 'idle'){
-      placeKnight(r,c);
+  function qBoardData(){
+    var n = save.qN, key = qKey(), b = save.qBoards[key];
+    if(Array.isArray(b)){
+      var seen = {};
+      b = b.filter(function(q){
+        if(!Array.isArray(q) || q[0] < 0 || q[0] >= n || q[1] < 0 || q[1] >= n) return false;
+        var id = q[0]*n + q[1];
+        if(seen[id]) return false;
+        seen[id] = true;
+        return true;
+      });
+      if(save.qMode === 'defi' && !b.some(function(q){ return q[2] === 1; })) b = null;
+    } else b = null;
+    if(b === null) b = save.qMode === 'defi' ? genDefi(n) : [];
+    save.qBoards[key] = b;
+    return b;
+  }
+
+  function qBuild(){
+    var n = save.qN, board = $('qBoard');
+    board.innerHTML = '';
+    Q.squares = [];
+    board.style.gridTemplateColumns = 'repeat(' + n + ',1fr)';
+    $('qWrap').style.setProperty('--cols', n);
+    for(var r=0;r<n;r++){
+      for(var c=0;c<n;c++){
+        var sq = el('div', 'sq q ' + (((r+c)%2 === 0) ? 'light' : 'dark'));
+        sq.setAttribute('data-r', r);
+        sq.setAttribute('data-c', c);
+        sq.setAttribute('role', 'button');
+        sq.setAttribute('tabindex', '0');
+        sq.appendChild(el('span', 'qpc'));
+        if(c === 0)   sq.appendChild(el('span', 'rank', String(n - r)));
+        if(r === n-1) sq.appendChild(el('span', 'file', FILES[c]));
+        board.appendChild(sq);
+        Q.squares[r*n + c] = sq;
+      }
+    }
+    Q.built = n;
+  }
+
+  function qBuildChips(){
+    var box = $('qSizes');
+    box.innerHTML = '';
+    for(var n=4;n<=10;n++){
+      var b = el('button', null, String(n));
+      b.type = 'button';
+      b.setAttribute('data-n', n);
+      b.setAttribute('aria-label', 'Échiquier ' + n + ' sur ' + n);
+      b.setAttribute('aria-pressed', 'false');
+      box.appendChild(b);
+    }
+  }
+
+  function qResetTransient(){
+    Q.tmpMsg = ''; Q.hintIdx = -1; Q.winMsg = '';
+    Q.reveal = false;
+    if(Q.revealTimer){ clearTimeout(Q.revealTimer); Q.revealTimer = null; }
+  }
+
+  function renderQueens(){
+    var n = save.qN, diff = save.qDiff, mode = save.qMode, i;
+    if(Q.built !== n) qBuild();
+    Q.queens = qBoardData();
+    var qs = Q.queens;
+    var coords = qs.map(function(q){ return [q[0], q[1]]; });
+    var conf = queenConflicts(coords);
+    var showConf = diff <= 1 || Q.reveal;
+    var att = diff === 0 ? queenAttacked(n, coords) : null;
+    var at = {};
+    qs.forEach(function(q, j){ at[q[0]*n + q[1]] = j; });
+    var won = qs.length === n && conf.pairs === 0;
+    if(!won) Q.winMsg = '';
+
+    for(i=0;i<n*n;i++){
+      var sq = Q.squares[i], j = at[i], has = j !== undefined;
+      var locked = has && qs[j][2] === 1, bad = has && showConf && conf.bad[j];
+      sq.classList.toggle('has', has);
+      sq.classList.toggle('locked', locked);
+      sq.classList.toggle('bad', !!bad);
+      sq.classList.toggle('attacked', !has && !!(att && att[i]));
+      sq.classList.toggle('hint', i === Q.hintIdx);
+      var pc = sq.firstChild;
+      if(has){ if(!pc.firstChild) pc.innerHTML = QUEEN_SVG; }
+      else if(pc.firstChild) pc.innerHTML = '';
+      var r = Math.floor(i / n), c = i % n;
+      var label = FILES[c] + (n - r);
+      if(has) label += ', dame' + (locked ? ' fixe' : '') + (bad ? ', en conflit' : '');
+      else if(att && att[i]) label += ', case attaquée';
+      sq.setAttribute('aria-label', label);
+    }
+
+    $('qCounter').textContent = qs.length + ' / ' + n;
+    var free = qs.filter(function(q){ return q[2] !== 1; }).length;
+
+    var text = '', cls = '';
+    if(won){
+      text = Q.winMsg || (mode === 'defi' ? 'Grille résolue ! Les ' + n + ' dames sont en paix.' : 'Solution complète : les ' + n + ' dames sont en paix.');
+      cls = 'won';
+    } else if(Q.tmpMsg){
+      text = Q.tmpMsg;
+    } else if(showConf && conf.pairs > 0){
+      text = conf.pairs + (conf.pairs > 1 ? ' paires de dames s’attaquent.' : ' paire de dames s’attaque.');
+      cls = 'stuck';
+    } else if(Q.reveal){
+      text = 'Aucun conflit pour l’instant.';
+    } else if(qs.length === n){
+      text = 'Les ' + n + ' dames sont posées. Appuyez sur Vérifier.';
+    } else if(free === 0){
+      text = mode === 'defi'
+        ? 'Complétez la grille : les dames marquées d’un point sont fixes.'
+        : 'Placez ' + n + ' dames sans qu’aucune n’en attaque une autre.';
+    } else {
+      var left = n - qs.length;
+      text = 'Il reste ' + left + (left > 1 ? ' dames' : ' dame') + ' à placer.';
+    }
+    var st = $('qStatus');
+    st.textContent = text;
+    st.className = 'status' + (cls ? ' ' + cls : '');
+    $('qWrap').classList.toggle('won', won);
+
+    setPressed($('qSizes'), 'data-n', n);
+    setPressed($('qModeSeg'), 'data-v', mode);
+    setPressed($('qDiffSeg'), 'data-v', diff);
+    $('qModeNote').textContent = Q_MODE_NOTES[mode];
+    $('qDiffNote').textContent = Q_DIFF_NOTES[diff];
+
+    $('qClear').disabled = free === 0;
+    var hb = $('qHint');
+    hb.hidden = diff === 1;
+    hb.textContent = diff === 0 ? 'Indice' : 'Vérifier';
+    hb.disabled = won;
+    var nb = $('qNew');
+    if(mode === 'defi'){ nb.hidden = false; nb.textContent = 'Nouvelle grille'; }
+    else { nb.hidden = !won; nb.textContent = 'Autre solution'; }
+
+    var coll = $('qColl');
+    coll.hidden = mode !== 'free';
+    if(mode === 'free'){
+      var list = Array.isArray(save.qFound[n]) ? save.qFound[n] : [], total = QUEEN_SOLUTIONS[n];
+      $('qMeter').style.width = Math.round(100 * list.length / total) + '%';
+      $('qCollText').innerHTML = '<b>' + list.length + ' / ' + total + '</b> solutions différentes pour ' + n +
+        ' dames (rotations et symétries comptées à part).';
+    }
+  }
+
+  function recordSolution(){
+    var n = save.qN, byRow = [];
+    Q.queens.forEach(function(q){ byRow[q[0]] = q[1]; });
+    var key = byRow.join(',');
+    var list = Array.isArray(save.qFound[n]) ? save.qFound[n] : (save.qFound[n] = []);
+    var total = QUEEN_SOLUTIONS[n];
+    if(list.indexOf(key) < 0){
+      list.push(key);
+      Q.winMsg = list.length === total
+        ? 'Incroyable : vous avez trouvé les ' + total + ' solutions !'
+        : 'Nouvelle solution ! Vous en avez ' + list.length + ' sur ' + total + '.';
+    } else {
+      Q.winMsg = 'Cette solution est déjà dans votre collection (' + list.length + ' / ' + total + ').';
+    }
+  }
+
+  function onQSquare(r, c){
+    var n = save.qN, qs = Q.queens, j, idx = -1;
+    var wasTmp = Q.tmpMsg;
+    Q.tmpMsg = ''; Q.hintIdx = -1;
+    if(Q.reveal){ Q.reveal = false; if(Q.revealTimer){ clearTimeout(Q.revealTimer); Q.revealTimer = null; } }
+    for(j=0;j<qs.length;j++) if(qs[j][0] === r && qs[j][1] === c){ idx = j; break; }
+    var sq = Q.squares[r*n + c];
+    if(idx >= 0){
+      if(qs[idx][2] === 1){
+        sq.classList.remove('invalid'); void sq.offsetWidth; sq.classList.add('invalid');
+        Q.tmpMsg = 'Cette dame est fixe : elle ne peut pas bouger.';
+        renderQueens();
+        return;
+      }
+      qs.splice(idx, 1);
+    } else {
+      if(qs.length >= n){
+        sq.classList.remove('invalid'); void sq.offsetWidth; sq.classList.add('invalid');
+        Q.tmpMsg = 'Les ' + n + ' dames sont déjà posées : retirez-en une d’abord.';
+        renderQueens();
+        return;
+      }
+      qs.push([r, c, 0]);
+      if(qs.length === n && queenConflicts(qs.map(function(q){ return [q[0], q[1]]; })).pairs === 0 && save.qMode === 'free') recordSolution();
+    }
+    persist();
+    renderQueens();
+    if(idx < 0){
+      var sq2 = Q.squares[r*n + c];
+      sq2.classList.add('pop');
+      setTimeout(function(){ sq2.classList.remove('pop'); }, 300);
+    }
+  }
+
+  function qHintAction(){
+    var n = save.qN, qs = Q.queens;
+    var coords = qs.map(function(q){ return [q[0], q[1]]; });
+    Q.tmpMsg = ''; Q.hintIdx = -1;
+    if(save.qDiff === 2){
+      Q.reveal = true;
+      if(Q.revealTimer) clearTimeout(Q.revealTimer);
+      Q.revealTimer = setTimeout(function(){ Q.reveal = false; Q.revealTimer = null; if(currentView() === 'queens') renderQueens(); }, 3500);
+      renderQueens();
       return;
     }
-    var legal = legalMovesFrom(state.knight.r, state.knight.c, state.board);
-    var isLegal = legal.some(function(m){ return m[0]===r && m[1]===c; });
-    if(isLegal && state.board[i]===0){
-      moveKnight(r,c);
+    if(queenConflicts(coords).pairs > 0){
+      Q.tmpMsg = 'Retirez d’abord les dames qui s’attaquent.';
     } else {
-      flashInvalid(i);
+      var sol = completeQueens(n, coords, true);
+      if(!sol){
+        Q.tmpMsg = 'Avec ces dames, plus aucune solution n’existe : retirez-en une.';
+      } else {
+        var missing = sol.filter(function(p){
+          return !coords.some(function(q){ return q[0] === p[0] && q[1] === p[1]; });
+        });
+        if(missing.length){
+          var pick = missing[Math.floor(Math.random() * missing.length)];
+          Q.hintIdx = pick[0]*n + pick[1];
+          Q.tmpMsg = 'Une bonne case est marquée.';
+        }
+      }
     }
+    renderQueens();
   }
 
-  function attachEvents(){
-    boardEl.addEventListener('click', function(e){
+  /* ============================================================
+     Branchement des événements
+     ============================================================ */
+  function bindSquares(board, handler){
+    board.addEventListener('click', function(e){
       var sq = e.target.closest('.sq');
-      if(!sq) return;
-      onSquareClick(+sq.dataset.r, +sq.dataset.c);
+      if(sq) handler(sq);
     });
-    boardEl.addEventListener('keydown', function(e){
+    board.addEventListener('keydown', function(e){
       if(e.key !== 'Enter' && e.key !== ' ') return;
       var sq = e.target.closest('.sq');
       if(!sq) return;
       e.preventDefault();
-      onSquareClick(+sq.dataset.r, +sq.dataset.c);
-    });
-    undoBtn.addEventListener('click', undo);
-    restartBtn.addEventListener('click', restart);
-    window.addEventListener('resize', function(){
-      if(state && state.knight) positionKnightTo(state.knight.r, state.knight.c);
+      handler(sq);
     });
   }
 
-  function render(){
-    var total = N*N;
-    var visited = state.history.length;
-    counterEl.textContent = visited + ' / ' + total;
+  function start(){
+    qBuildChips();
 
-    var legalSet = null;
-    if(state.phase === 'playing' && state.knight){
-      legalSet = {};
-      legalMovesFrom(state.knight.r, state.knight.c, state.board).forEach(function(m){
-        legalSet[idx(m[0],m[1])] = true;
+    tabBtns.forEach(function(b, idx){
+      b.addEventListener('click', function(){ goTab(b.getAttribute('data-tab')); });
+      b.addEventListener('keydown', function(e){
+        var d = e.key === 'ArrowRight' ? 1 : e.key === 'ArrowLeft' ? -1 : 0;
+        if(!d) return;
+        e.preventDefault();
+        var nb = tabBtns[(idx + d + tabBtns.length) % tabBtns.length];
+        nb.focus();
+        goTab(nb.getAttribute('data-tab'));
+      });
+    });
+    $('goKnight').addEventListener('click', function(){ goTab('knight'); });
+    $('goQueens').addEventListener('click', function(){ goTab('queens'); });
+
+    $('kDiffSeg').addEventListener('click', function(e){
+      var b = e.target.closest('button');
+      if(!b) return;
+      save.kDiff = +b.getAttribute('data-v');
+      persist();
+      renderSelect();
+    });
+    $('kBack').addEventListener('click', function(){
+      save.kScreen = 'select';
+      persist();
+      showTab();
+      window.scrollTo(0, 0);
+    });
+    bindSquares($('board'), function(sq){ onKSquare(+sq.getAttribute('data-i')); });
+    $('undoBtn').addEventListener('click', kUndo);
+    $('restartBtn').addEventListener('click', kRestart);
+    $('kHintBtn').addEventListener('click', kHint);
+    $('nextBtn').addEventListener('click', function(){
+      var next = null;
+      for(var i=0;i<LEVELS.length;i++) if(LEVELS[i].id === K.L.id && LEVELS[i+1]) next = LEVELS[i+1];
+      if(next) openLevel(next.id);
+      else { save.kScreen = 'select'; persist(); showTab(); window.scrollTo(0, 0); }
+    });
+
+    $('qSizes').addEventListener('click', function(e){
+      var b = e.target.closest('button');
+      if(!b) return;
+      save.qN = +b.getAttribute('data-n');
+      qResetTransient();
+      persist();
+      renderQueens();
+    });
+    $('qModeSeg').addEventListener('click', function(e){
+      var b = e.target.closest('button');
+      if(!b) return;
+      save.qMode = b.getAttribute('data-v');
+      qResetTransient();
+      persist();
+      renderQueens();
+    });
+    $('qDiffSeg').addEventListener('click', function(e){
+      var b = e.target.closest('button');
+      if(!b) return;
+      save.qDiff = +b.getAttribute('data-v');
+      qResetTransient();
+      persist();
+      renderQueens();
+    });
+    bindSquares($('qBoard'), function(sq){ onQSquare(+sq.getAttribute('data-r'), +sq.getAttribute('data-c')); });
+    $('qClear').addEventListener('click', function(){
+      var arr = Q.queens;
+      for(var j=arr.length-1;j>=0;j--) if(arr[j][2] !== 1) arr.splice(j, 1);
+      qResetTransient();
+      persist();
+      renderQueens();
+    });
+    $('qHint').addEventListener('click', qHintAction);
+    $('qNew').addEventListener('click', function(){
+      save.qBoards[qKey()] = save.qMode === 'defi' ? genDefi(save.qN) : [];
+      qResetTransient();
+      persist();
+      renderQueens();
+    });
+
+    window.addEventListener('resize', function(){
+      if(currentView() === 'game' && K.L){ K.snap = true; renderKnight(); }
+    });
+    window.addEventListener('load', function(){
+      if(currentView() === 'game' && K.L){ K.snap = true; renderKnight(); }
+    });
+    if(document.fonts && document.fonts.ready){
+      document.fonts.ready.then(function(){
+        if(currentView() === 'game' && K.L){ K.snap = true; renderKnight(); }
       });
     }
 
-    for(var r=0;r<N;r++){
-      for(var c=0;c<N;c++){
-        var i = idx(r,c);
-        var el = squareEls[i];
-        var v = state.board[i];
-        var orderSpan = el.querySelector('.order');
-
-        if(v>0){
-          var alpha = 0.18 + 0.6 * (v / Math.max(visited,1));
-          el.style.background = 'rgba(' + getComputedStyleAccent() + ',' + alpha.toFixed(3) + ')';
-          orderSpan.textContent = v;
-        } else {
-          el.style.background = '';
-          orderSpan.textContent = '';
-        }
-
-        var isLegal = !!(legalSet && legalSet[i]);
-        var isCurrent = !!(state.knight && state.knight.r===r && state.knight.c===c);
-        el.classList.toggle('legal', isLegal);
-        el.classList.toggle('current', isCurrent);
-
-        var label = squareName(r,c);
-        if(v>0) label += ', visitée, coup ' + v;
-        else if(isLegal) label += ', coup possible';
-        el.setAttribute('aria-label', label);
-      }
-    }
-
-    if(state.knight){
-      knightEl.classList.add('placed');
-      positionKnightTo(state.knight.r, state.knight.c);
-    } else {
-      knightEl.classList.remove('placed');
-    }
-
-    boardWrapEl.classList.toggle('won', state.phase==='won');
-    statusEl.classList.toggle('won', state.phase==='won');
-    statusEl.classList.toggle('stuck', state.phase==='stuck');
-    statusEl.textContent =
-      state.phase==='idle' ? 'Touchez une case pour placer le cavalier.' :
-      state.phase==='playing' ? '' :
-      state.phase==='stuck' ? 'Plus aucun coup possible. Annulez ou recommencez.' :
-      'Parcours complet ! Les 64 cases sont visitées.';
-
-    undoBtn.disabled = state.history.length===0;
-
-    var names = state.history.map(function(h){ return squareName(h.r,h.c); });
-    pathLabelEl.textContent = 'Parcours (' + names.length + ')';
-    if(names.length===0){
-      pathListEl.textContent = '—';
-    } else {
-      var head = names.slice(0,-1).join(' → ');
-      var tail = names[names.length-1];
-      pathListEl.innerHTML = (head ? head + ' → ' : '') + '<span>' + tail + '</span>';
-    }
+    showTab();
   }
 
-  function getComputedStyleAccent(){ return '79,143,230'; }
-
-  function start(initialData){
-    state = (initialData && Array.isArray(initialData.board) && initialData.board.length===N*N)
-      ? sanitize(initialData)
-      : loadFromStorageOrFresh();
-    buildBoard();
-    attachEvents();
-    render();
-  }
-
-  if(window.claude && window.claude.hot && window.claude.hot.snapshot){
-    window.claude.hot.snapshot(getSnapshot);
-  }
-  if(window.claude && window.claude.hot && window.claude.hot.ready){
-    window.claude.hot.ready(start);
-  } else {
-    start((window.claude && window.claude.hot && window.claude.hot.data) || {});
-  }
+  start();
 })();
-</script>
 
-</body></html>
+</script>
+</body>
+</html>
